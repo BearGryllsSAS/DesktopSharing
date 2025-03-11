@@ -1,4 +1,7 @@
 ﻿#include "GDIScreenCapture.h"
+extern "C" {
+#include <libavutil/pixdesc.h>  // 提供 av_get_pix_fmt_name 函数声明
+}
 #include <Windows.h>
 
 GDIScreenCapture::GDIScreenCapture()
@@ -356,6 +359,8 @@ bool GDIScreenCapture::Decode(AVFrame* av_frame, AVPacket* av_packet)
 		if (ret < 0) {
 			return false;
 		}
+
+		// printf("[DEBUG] Pixel format: %s\n", av_get_pix_fmt_name(codec_context_->pix_fmt));
 
 		std::lock_guard<std::mutex> locker(mutex_);
 

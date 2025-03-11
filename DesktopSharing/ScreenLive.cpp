@@ -378,14 +378,57 @@ int ScreenLive::StartEncoder(AVConfig& config)
 
 	av_config_ = config;
 
+	// 配置视频编码参数
+	/*
+	​关键参数：
+​		GOP（Group of Pictures）​：设置为帧率，意味着关键帧间隔为1秒（如帧率30，则GOP=30）。
+		​像素格式：AV_PIX_FMT_BGRA，通常用于未压缩的屏幕捕获数据。
+	*/
+	/*
+	1. GOP 的含义
+​		定义：
+			GOP 是视频编码中两个连续关键帧（I帧）之间的帧序列。例如：GOP = 30 表示每30帧插入一个关键帧（I帧），后续的P帧或B帧基于I帧进行压缩。
+​		结构：
+			典型的 GOP 结构如 I-B-B-P-B-B-P...，其中：
+​			I帧​（关键帧）：完整编码的帧，不依赖其他帧。
+​			P帧​（预测帧）：依赖前一帧（I或P帧）进行压缩。
+​			B帧​（双向预测帧）：依赖前后帧进行压缩（压缩率更高，但延迟增加）。
+
+​	2. GOP 应设置为多少？
+		GOP 的设置需权衡 ​压缩效率、容错能力 和 ​随机访问性能：
+		
+​			(1) 较小的 GOP（如1秒）
+​				优点：
+​					容错性好：网络丢包或解码错误时，可以更快恢复（关键帧频繁出现）。
+​					低延迟随机访问：适合直播、实时通信（如视频会议），用户随时加入都能快速看到完整画面。
+​				缺点：
+​					码率较高：I帧体积远大于P/B帧，频繁插入I帧会增加整体码率。
+​					压缩效率低：帧间冗余未充分利用。
+
+​			(2) 较大的 GOP（如5-10秒）​
+​				优点：
+​					压缩效率高：减少I帧数量，提高压缩率（适合存储或带宽受限场景）。
+​					码率更稳定：P/B帧占比高，码率波动小。
+​				缺点：
+​					容错性差：一旦丢包，需要等待下一个I帧才能恢复画面。
+​					随机访问延迟高：点播场景中拖动进度条可能需要等待I帧。
+​		3. 推荐设置
+​			实时场景（直播、视频会议）​：
+​				GOP = 1-2秒​（如帧率30 → GOP=30~60），平衡容错和压缩效率。
+​			点播场景（电影、录播）​：
+​				GOP = 4-10秒​（如帧率24 → GOP=96~240），提高压缩率。
+​			极端网络环境：
+				若网络极不稳定，可缩短 GOP（如0.5秒）以增强容错性，但需接受更高的码率。
+	*/
 	ffmpeg::AVConfig encoder_config;
 	encoder_config.video.framerate = av_config_.framerate;
 	encoder_config.video.bitrate = av_config_.bitrate_bps;
-	encoder_config.video.gop = av_config_.framerate;
+	encoder_config.video.gop = av_config_.framerate * 2;
 	encoder_config.video.format = AV_PIX_FMT_BGRA;
 	encoder_config.video.width = screen_capture_->GetWidth();
 	encoder_config.video.height = screen_capture_->GetHeight();
 
+	// 视频编码器的初始化
 	h264_encoder_.SetCodec(config.codec);
 
 	if (!h264_encoder_.Init(av_config_.framerate, av_config_.bitrate_bps/1000,

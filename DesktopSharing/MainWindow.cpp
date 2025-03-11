@@ -276,21 +276,27 @@ bool MainWindow::UpdateARGB(const uint8_t* data, uint32_t width, uint32_t height
 	return false;
 }
 
+/*
+根据用户选择的编码器配置和直播类型（RTSP服务器、RTSP推送、RTMP推送），初始化编码器并启动对应的直播服务。
+*/
 bool MainWindow::StartLive(int& event_type, 
 	std::vector<std::string>& encoder_settings,
 	std::vector<std::string>& live_settings)
 {
+	// 解析编码器配置（从ui界面获取）
 	AVConfig avconfig;
 	avconfig.framerate = atoi(encoder_settings[1].c_str());
 	avconfig.bitrate_bps = atoi(encoder_settings[2].c_str()) * 1000U;
 	avconfig.codec = encoder_settings[0];
 
+	// 硬件编码器支持检查
 	if ((avconfig.codec == "h264_nvenc" && !nvenc_info.is_supported()) ||
 		(avconfig.codec == "h264_qsv" && !QsvEncoder::IsSupported())) {
 		avconfig.codec = "x264";	
 	}
 
 	/* reset video encoder */
+	// 重新初始化编码器（配置变化时）
 	if (avconfig_ != avconfig) {
 		ScreenLive::Instance().StopLive(SCREEN_LIVE_RTSP_SERVER);
 		ScreenLive::Instance().StopLive(SCREEN_LIVE_RTSP_PUSHER);

@@ -1,4 +1,4 @@
-#include "H264Encoder.h"
+ï»¿#include "H264Encoder.h"
 
 H264Encoder::H264Encoder()
 {
@@ -15,6 +15,15 @@ void H264Encoder::SetCodec(std::string codec)
 	codec_ = codec;
 }
 
+/*
+åˆå§‹åŒ– H.264 ç¼–ç å™¨ï¼Œæ”¯æŒä¸‰ç§åç«¯ï¼š
+
+â€‹	FFmpeg è½¯ä»¶ç¼–ç â€‹ï¼ˆé»˜è®¤å¿…é€‰ï¼‰
+â€‹	NVIDIA NVENC ç¡¬ä»¶ç¼–ç â€‹ï¼ˆéœ€æ˜¾å¼æŒ‡å®š "h264_nvenc"ï¼‰
+â€‹	Intel QSV ç¡¬ä»¶ç¼–ç â€‹ï¼ˆéœ€æ˜¾å¼æŒ‡å®š "h264_qsv"ï¼‰
+
+è‹¥æŒ‡å®šç¡¬ä»¶ç¼–ç å™¨å¤±è´¥ï¼Œä»ä¼šä¿ç•™å·²åˆå§‹åŒ–çš„è½¯ä»¶ç¼–ç å™¨ï¼Œä½†é€»è¾‘ä¸Šå¯èƒ½è¿”å› trueï¼Œå¯¼è‡´ä¸Šå±‚è¯¯è®¤ä¸ºåˆå§‹åŒ–æˆåŠŸã€‚
+*/
 bool H264Encoder::Init(int framerate, int bitrate_kbps, int format, int width, int height)
 {
 	encoder_config_.video.framerate = framerate;
@@ -96,15 +105,15 @@ bool H264Encoder::IsKeyFrame(const uint8_t* data, uint32_t size)
 int H264Encoder::Encode(uint8_t* in_buffer, uint32_t in_width, uint32_t in_height,
 						uint32_t image_size, std::vector<uint8_t>& out_frame)
 {
-	// Çå¿ÕÊä³ö»º³åÇø¡£
+	// æ¸…ç©ºè¾“å‡ºç¼“å†²åŒºã€‚
 	out_frame.clear();
 
-	// ¼ì²é±àÂëÆ÷ÉÏÏÂÎÄÊÇ·ñ´æÔÚ¡£
+	// æ£€æŸ¥ç¼–ç å™¨ä¸Šä¸‹æ–‡æ˜¯å¦å­˜åœ¨ã€‚
 	if (!h264_encoder_.GetAVCodecContext()) {
 		return -1;
 	}
 
-	// ·ÖÅäÁÙÊ±Êä³ö»º³åÇø£¬´óĞ¡Îªwidth*height*4£¨¼ÙÉèÎªRGBA/BGRA¸ñÊ½µÄ±£ÊØ¹À¼Æ£©¡£
+	// åˆ†é…ä¸´æ—¶è¾“å‡ºç¼“å†²åŒºï¼Œå¤§å°ä¸ºwidth*height*4ï¼ˆå‡è®¾ä¸ºRGBA/BGRAæ ¼å¼çš„ä¿å®ˆä¼°è®¡ï¼‰ã€‚
 	int frame_size = 0;
 	int max_buffer_size = encoder_config_.video.width * encoder_config_.video.height * 4;
 	std::shared_ptr<uint8_t> out_buffer(new uint8_t[max_buffer_size], std::default_delete<uint8_t[]>());
@@ -127,49 +136,74 @@ int H264Encoder::Encode(uint8_t* in_buffer, uint32_t in_width, uint32_t in_heigh
 	else if (qsv_encoder_.IsInitialized()) {
 		frame_size = qsv_encoder_.Encode(in_buffer, in_width, in_height, out_buffer.get(), max_buffer_size);
 	}
-	else {	// FFmpegÈí¼ş±àÂë£¨Ä¬ÈÏ£©
+	else {	// FFmpegè½¯ä»¶ç¼–ç ï¼ˆé»˜è®¤ï¼‰
 
 		/*
-		×÷ÓÃ£º
-			µ÷ÓÃFFmpeg±àÂë½Ó¿Ú£¬½«ÊäÈëÍ¼Ïñ£¨in_buffer£©±àÂëÎªH.264Êı¾İ°ü£¨AVPacket£©¡£
-		ÊäÈë²ÎÊı£º
-			in_buffer£ºÔ­Ê¼Í¼ÏñÊı¾İ¡£
-			in_width/in_height£ºÍ¼Ïñ·Ö±æÂÊ¡£
-			image_size£ºÊäÈëÊı¾İ´óĞ¡¡£
-		Êä³ö£º
-			pkt_ptr£ºÖÇÄÜÖ¸Õë°ü¹üµÄAVPacket£¬´æ´¢±àÂëºóµÄH.264Êı¾İ¡£
+		ä½œç”¨ï¼š
+			è°ƒç”¨FFmpegç¼–ç æ¥å£ï¼Œå°†è¾“å…¥å›¾åƒï¼ˆin_bufferï¼‰ç¼–ç ä¸ºH.264æ•°æ®åŒ…ï¼ˆAVPacketï¼‰ã€‚
+		è¾“å…¥å‚æ•°ï¼š
+			in_bufferï¼šåŸå§‹å›¾åƒæ•°æ®ã€‚
+			in_width/in_heightï¼šå›¾åƒåˆ†è¾¨ç‡ã€‚
+			image_sizeï¼šè¾“å…¥æ•°æ®å¤§å°ã€‚
+		è¾“å‡ºï¼š
+			pkt_ptrï¼šæ™ºèƒ½æŒ‡é’ˆåŒ…è£¹çš„AVPacketï¼Œå­˜å‚¨ç¼–ç åçš„H.264æ•°æ®ã€‚
 		*/
 		ffmpeg::AVPacketPtr pkt_ptr = h264_encoder_.Encode(in_buffer, in_width, in_height, image_size);
 		int extra_data_size = 0;
 		uint8_t* extra_data = nullptr;
 
-		// ´¦Àí¹Ø¼üÖ¡ÓëSPS/PPS
+		// å¤„ç†å…³é”®å¸§ä¸SPS/PPS
 		if (pkt_ptr != nullptr) {		
-			// ×÷ÓÃ£º¼ì²éµ±Ç°Êı¾İ°üÊÇ·ñÎª¹Ø¼üÖ¡£¨IÖ¡£©¡£
+			// ä½œç”¨ï¼šæ£€æŸ¥å½“å‰æ•°æ®åŒ…æ˜¯å¦ä¸ºå…³é”®å¸§ï¼ˆIå¸§ï¼‰ã€‚
+			
 			if (IsKeyFrame(pkt_ptr->data, pkt_ptr->size)) {
-				/* ±àÂëÆ÷Ê¹ÓÃÁËAV_CODEC_FLAG_GLOBAL_HEADER, ÕâÀïĞèÒªÌí¼Ósps, pps */
+				/* ç¼–ç å™¨ä½¿ç”¨äº†AV_CODEC_FLAG_GLOBAL_HEADER, è¿™é‡Œéœ€è¦æ·»åŠ sps, pps */
 
 				/*
-				±³¾°£º
-					µ±±àÂëÆ÷ÉèÖÃAV_CODEC_FLAG_GLOBAL_HEADERÊ±£¬SPS£¨ĞòÁĞ²ÎÊı¼¯£©ºÍPPS£¨Í¼Ïñ²ÎÊı¼¯£©´æ´¢ÔÚextradataÖĞ£¬¶ø·ÇÃ¿¸ö¹Ø¼üÖ¡ÄÚ¡£
-					Á÷Ã½Ìå´«Êä£¨ÈçRTP£©ÒªÇóÃ¿¸ö¹Ø¼üÖ¡Ç°Ğ¯´øSPS/PPS£¬·ñÔò½âÂëÆ÷ÎŞ·¨³õÊ¼»¯¡£
-				²Ù×÷£º
-					´Ó±àÂëÆ÷ÉÏÏÂÎÄÖĞÌáÈ¡extradata£¨°üº¬SPS/PPS£©¡£
-					½«extradata¿½±´µ½Êä³ö»º³åÇøµÄÍ·²¿¡£
+				èƒŒæ™¯ï¼š
+					å½“ç¼–ç å™¨è®¾ç½®AV_CODEC_FLAG_GLOBAL_HEADERæ—¶ï¼ŒSPSï¼ˆåºåˆ—å‚æ•°é›†ï¼‰å’ŒPPSï¼ˆå›¾åƒå‚æ•°é›†ï¼‰å­˜å‚¨åœ¨extradataä¸­ï¼Œè€Œéæ¯ä¸ªå…³é”®å¸§å†…ã€‚
+					RTPåè®®è™½ä¸å¼ºåˆ¶è¦æ±‚ï¼Œä½†åœ¨å®é™…åº”ç”¨ä¸­ï¼Œâ€‹å»ºè®®åœ¨å…³é”®å¸§å‰æºå¸¦SPS/PPSæˆ–å‘¨æœŸæ€§å‘é€ï¼Œä»¥æå‡å…¼å®¹æ€§å’Œå®¹é”™æ€§ã€‚è¿™æ˜¯å·¥ç¨‹å®è·µä¸­çš„å¸¸è§ä¼˜åŒ–ï¼Œç¡®ä¿ä¸åŒå®¢æˆ·ç«¯å’Œç½‘ç»œæ¡ä»¶ä¸‹çš„å¯é è§£ç ã€‚
+
+					â€‹åœºæ™¯ï¼š	â€‹					æ˜¯å¦éœ€è¦å…³é”®å¸§å‰æºå¸¦SPS/PPSï¼š
+â€‹					SDPè§£æå¯é ä¸”æ— ä¸­é€”åŠ å…¥		ä¸éœ€è¦
+â€‹					ä¸­é€”åŠ å…¥/å…¼å®¹æ€§è¦æ±‚é«˜		éœ€è¦
+â€‹					åŠ¨æ€å‚æ•°å˜æ›´				éœ€è¦ï¼ˆæºå¸¦æ›´æ–°çš„SPS/PPSï¼‰
+
+				æ“ä½œï¼š
+					ä»ç¼–ç å™¨ä¸Šä¸‹æ–‡ä¸­æå–extradataï¼ˆåŒ…å«SPS/PPSï¼‰ã€‚
+					å°†extradataæ‹·è´åˆ°è¾“å‡ºç¼“å†²åŒºçš„å¤´éƒ¨ã€‚
 				*/
 
 				/*
-				¹Ø¼ü¸ÅÄî½âÎö
+				AV_CODEC_FLAG_GLOBAL_HEADER çš„ä½œç”¨ï¼š
+					é›†ä¸­ç®¡ç† SPS/PPSï¼Œå‡å°‘å†—ä½™ã€‚
+â€‹				å…³é”®å¸§å‰æ’å…¥ SPS/PPS çš„åŸå› ï¼š
+					æµåª’ä½“åè®®è¦æ±‚æ˜¾å¼ä¼ é€’åˆå§‹åŒ–å‚æ•°ã€‚
+					å®¹é”™å®¢æˆ·ç«¯ä¸­é€”åŠ å…¥æˆ–åè®®å¤´ä¸¢å¤±ã€‚
+â€‹				extradata çš„å­˜å‚¨ä½ç½®ï¼š
+					AVCodecContext->extradataï¼Œéœ€æ‰‹åŠ¨æ’å…¥åˆ°å…³é”®å¸§å‰ã€‚
+				ç»“è®ºï¼š
+					åœ¨æµåª’ä½“ä¼ è¾“ä¸­ï¼ŒAV_CODEC_FLAG_GLOBAL_HEADER å’Œ â€‹å…³é”®å¸§å‰æ’å…¥ SPS/PPS æ˜¯äº’è¡¥æ“ä½œï¼Œå‰è€…ç”¨äºé›†ä¸­ç®¡ç†å‚æ•°ï¼Œåè€…ç”¨äºåè®®å…¼å®¹æ€§å’Œå®¹é”™æ€§ã€‚
+				*/
+
+				/*
+				åœºæ™¯ï¼š				AV_CODEC_FLAG_GLOBAL_HEADER çš„ä½œç”¨ï¼š		å…³é”®å¸§å‰æ’å…¥ SPS/PPS çš„ç”¨é€”ï¼š
+â€‹				æ–‡ä»¶å­˜å‚¨ï¼ˆMP4ï¼‰â€‹		SPS/PPS å†™å…¥æ–‡ä»¶å¤´ï¼Œä¸é‡å¤					æ— éœ€æ’å…¥
+â€‹				æµä¼ è¾“ï¼ˆRTMPï¼‰â€‹		SPS/PPS å­˜å‚¨åœ¨ extradata					éœ€é€šè¿‡åè®®å¤´å‘é€ï¼Œå¹¶åœ¨å…³é”®å¸§å‰æ’å…¥
+				*/
+
+				/*
+				å…³é”®æ¦‚å¿µè§£æ
 				(1) SPS/PPS
-						SPS£¨Sequence Parameter Set£©£º¶¨ÒåÊÓÆµ·Ö±æÂÊ¡¢Ö¡ÂÊ¡¢±àÂëµµ´ÎµÈÈ«¾Ö²ÎÊı¡£
-						PPS£¨Picture Parameter Set£©£º¶¨ÒåìØ±àÂëÄ£Ê½¡¢·ÖÆ¬²ÎÊıµÈÍ¼Ïñ¼¶²ÎÊı¡£
-					´æ´¢Î»ÖÃ£º
-						ÎŞAV_CODEC_FLAG_GLOBAL_HEADER£ºSPS/PPSÇ¶ÈëÃ¿¸ö¹Ø¼üÖ¡¡£
-						ÓĞAV_CODEC_FLAG_GLOBAL_HEADER£ºSPS/PPS´æ´¢ÔÚextradata£¬ĞèÊÖ¶¯Ìí¼Ó¡£
+						SPSï¼ˆSequence Parameter Setï¼‰ï¼šå®šä¹‰è§†é¢‘åˆ†è¾¨ç‡ã€å¸§ç‡ã€ç¼–ç æ¡£æ¬¡ç­‰å…¨å±€å‚æ•°ã€‚
+						PPSï¼ˆPicture Parameter Setï¼‰ï¼šå®šä¹‰ç†µç¼–ç æ¨¡å¼ã€åˆ†ç‰‡å‚æ•°ç­‰å›¾åƒçº§å‚æ•°ã€‚
+					å­˜å‚¨ä½ç½®ï¼š
+						æ— AV_CODEC_FLAG_GLOBAL_HEADERï¼šSPS/PPSåµŒå…¥æ¯ä¸ªå…³é”®å¸§ã€‚
+						æœ‰AV_CODEC_FLAG_GLOBAL_HEADERï¼šSPS/PPSå­˜å‚¨åœ¨extradataï¼Œéœ€æ‰‹åŠ¨æ·»åŠ ã€‚
 				
 				(2) AV_CODEC_FLAG_GLOBAL_HEADER
-						×÷ÓÃ£ºÖ¸Ê¾±àÂëÆ÷½«È«¾ÖÍ·ĞÅÏ¢£¨ÈçSPS/PPS£©·ÖÀëµ½extradataÖĞ¡£
-						µäĞÍ³¡¾°£ºÉú³ÉMP4ÎÄ¼şÊ±£¬SPS/PPSĞ´ÈëÎÄ¼şÍ·£»Á÷Ã½Ìå´«ÊäÊ±ĞèÊÖ¶¯²åÈëµ½¹Ø¼üÖ¡Ç°¡£
+						ä½œç”¨ï¼šæŒ‡ç¤ºç¼–ç å™¨å°†å…¨å±€å¤´ä¿¡æ¯ï¼ˆå¦‚SPS/PPSï¼‰åˆ†ç¦»åˆ°extradataä¸­ã€‚
+						å…¸å‹åœºæ™¯ï¼šç”ŸæˆMP4æ–‡ä»¶æ—¶ï¼ŒSPS/PPSå†™å…¥æ–‡ä»¶å¤´ï¼›æµåª’ä½“ä¼ è¾“æ—¶éœ€æ‰‹åŠ¨æ’å…¥åˆ°å…³é”®å¸§å‰ã€‚
 				*/
 
 				extra_data = h264_encoder_.GetAVCodecContext()->extradata;
@@ -179,11 +213,11 @@ int H264Encoder::Encode(uint8_t* in_buffer, uint32_t in_width, uint32_t in_heigh
 			}
 
 			/*
-			×÷ÓÃ£º
-				½«AVPacketÖĞµÄH.264Êı¾İ£¨ÈçNALUµ¥Ôª£©×·¼Óµ½Êä³ö»º³åÇø¡£
-			½á¹û£º
-				¹Ø¼üÖ¡Êı¾İ¸ñÊ½£º[SPS][PPS][IDRÖ¡Êı¾İ]¡£
-				·Ç¹Ø¼üÖ¡Êı¾İ¸ñÊ½£º[ÆÕÍ¨Ö¡Êı¾İ]¡£
+			ä½œç”¨ï¼š
+				å°†AVPacketä¸­çš„H.264æ•°æ®ï¼ˆå¦‚NALUå•å…ƒï¼‰è¿½åŠ åˆ°è¾“å‡ºç¼“å†²åŒºã€‚
+			ç»“æœï¼š
+				å…³é”®å¸§æ•°æ®æ ¼å¼ï¼š[SPS][PPS][IDRå¸§æ•°æ®]ã€‚
+				éå…³é”®å¸§æ•°æ®æ ¼å¼ï¼š[æ™®é€šå¸§æ•°æ®]ã€‚
 			*/
 
 			memcpy(out_buffer.get() + frame_size, pkt_ptr->data, pkt_ptr->size);
@@ -191,7 +225,7 @@ int H264Encoder::Encode(uint8_t* in_buffer, uint32_t in_width, uint32_t in_heigh
 		}
 	}
 
-	// ½«ÁÙÊ±»º³åÇøÊı¾İ¿½±´µ½out_frame£¬·µ»Ø±àÂëºóÊı¾İ´óĞ¡¡£
+	// å°†ä¸´æ—¶ç¼“å†²åŒºæ•°æ®æ‹·è´åˆ°out_frameï¼Œè¿”å›ç¼–ç åæ•°æ®å¤§å°ã€‚
 	if (frame_size > 0) {
 		out_frame.resize(frame_size);
 		out_frame.assign(out_buffer.get(), out_buffer.get() + frame_size);
