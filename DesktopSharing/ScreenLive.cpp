@@ -599,6 +599,38 @@ void ScreenLive::EncodeAudio()
 
 void ScreenLive::PushVideo(const uint8_t* data, uint32_t size, uint32_t timestamp)
 {
+	/*
+	1. H.264 起始码详解
+​		(1) 起始码的作用
+​			标识 NALU 边界：H.264 码流由多个 NALU（Network Abstraction Layer Unit）组成，每个 NALU 前有一个起始码，用于解码器识别数据块的开始。
+​			起始码类型：
+​			3 字节起始码：0x00 0x00 0x01，用于普通 NALU。
+​			4 字节起始码：0x00 0x00 0x00 0x01，用于流中的随机访问点（如 SPS、PPS）。
+​		
+		(2) 起始码的替代方案
+			在流媒体传输中，起始码可能被替换为其他标识方式：
+	
+​			场景	​				起始码处理方式	​						示例协议/格式
+			原始 H.264 流			保留起始码								裸流文件（.h264）
+			RTP 传输				去除起始码，添加 NALU 长度前缀			RTSP/RTP
+			FLV/MP4 封装			去除起始码，添加 AVCPacket 头			RTMP/HTTP-FLV
+​		
+		(3) 为什么需要去掉起始码？
+​			协议规范要求：
+​				RTMP/FLV：FLV 格式要求 H.264 数据以 AVCPacket 形式封装，其中包含 NALU 长度 + NALU 数据，不允许起始码。
+​				RTP：RFC 6184 规定 RTP 包的 H.264 负载需去除起始码，改用分片或聚合方式。
+​			节省带宽：起始码占用额外字节（3~4 字节），移除后可减少传输开销。
+​	
+	2. 代码示例验证
+		假设编码器输出的 H.264 数据如下：
+		
+		原始数据（Hex）：00 00 00 01 67 42 80 29 ... [NALU 数据]
+​			去除起始码：跳过前 4 字节，剩余数据为 67 42 80 29 ...（即 NALU 头 + 有效负载）。
+​			封装到 RTMP：在 FLV 的 AVCPacket 中插入 NALU 长度（4 字节大端） + NALU 数据：
+			AVCPacket 头：00 00 00 0A  // 假设 NALU 长度为 10 字节
+			NALU 数据：67 42 80 29 ...
+	*/
+
 	xop::AVFrame video_frame(size);
 	video_frame.size = size - 4; /* -4 去掉H.264起始码 */
 	video_frame.type = IsKeyFrame(data, size) ? xop::VIDEO_FRAME_I : xop::VIDEO_FRAME_P;

@@ -280,6 +280,7 @@ void RtpConnection::SetRtpHeader(MediaChannelId channel_id, RtpPacket pkt)
 */
 int RtpConnection::SendRtpPacket(MediaChannelId channel_id, RtpPacket pkt)
 {    
+	// 这条线跟过来的话，有时候会经过这里，导致直接返回-1。因为rtsp协议相关的工作还没做好
 	if (is_closed_) {
 		return -1;
 	}

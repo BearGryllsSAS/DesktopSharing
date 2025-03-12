@@ -22,6 +22,7 @@ RtspConnection::RtspConnection(std::shared_ptr<Rtsp> rtsp, TaskScheduler *task_s
 	, rtsp_request_(new RtspRequest)
 	, rtsp_response_(new RtspResponse)
 {
+	// 连接socket上有事件会调用OnRead函数
 	this->SetReadCallback([this](std::shared_ptr<TcpConnection> conn, xop::BufferReader& buffer) {
 		return this->OnRead(buffer);
 	});
@@ -32,7 +33,10 @@ RtspConnection::RtspConnection(std::shared_ptr<Rtsp> rtsp, TaskScheduler *task_s
 
 	alive_count_ = 1;
 
-	rtp_channel_->SetReadCallback([this]() { this->HandleRead(); });
+	rtp_channel_->SetReadCallback([this]() 
+	{ 
+		this->HandleRead(); 
+	});
 	rtp_channel_->SetWriteCallback([this]() { this->HandleWrite(); });
 	rtp_channel_->SetCloseCallback([this]() { this->HandleClose(); });
 	rtp_channel_->SetErrorCallback([this]() { this->HandleError(); });

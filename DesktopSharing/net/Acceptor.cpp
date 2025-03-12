@@ -49,7 +49,9 @@ int Acceptor::Listen(std::string ip, uint16_t port) {
     channel_ptr_.reset(new Channel(sockfd)); // 把监听 sockfd 做成 Channel 对象，赋值给 Acceptor 类中的 Channel 类型的智能指针成员变量
     channel_ptr_->SetReadCallback([this]() { this->OnAccept(); }); // 当监听 sockfd 有读事件（连接事件）的时候，调用 void Acceptor::OnAccept() 处理新的客户端连接
     channel_ptr_->EnableReading();
+    // 加入select队列
     event_loop_->UpdateChannel(channel_ptr_); // event_loop_ 是 Acceptor 类中 EventLoop* 类型的成员变量，EventLoop 封装着线程容器、调度器容器（所有的任务都是在调度器中处理的）
+   
     /*
     void EventLoop::UpdateChannel(ChannelPtr channel)
     {

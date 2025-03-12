@@ -108,6 +108,8 @@ void EventLoop::Loop()
 		std::shared_ptr<std::thread> thread(new std::thread(&TaskScheduler::Start, task_scheduler_ptr.get()));
 		thread->native_handle();
 		threads_.push_back(thread);
+
+		// 在EventLoop里面，开一个线程去管理一个任务调度器
 	}
 
 	const int priority = TASK_SCHEDULER_PRIORITY_REALTIME;
