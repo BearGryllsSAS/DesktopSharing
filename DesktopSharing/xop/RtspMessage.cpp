@@ -371,6 +371,7 @@ uint16_t RtspRequest::GetRtcpPort() const
 	return 0;
 }
 
+// 构建RTSP协议中OPTIONS请求的响应消息
 int RtspRequest::BuildOptionRes(const char* buf, int buf_size)
 {
 	memset((void*)buf, 0, buf_size);

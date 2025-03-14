@@ -226,6 +226,7 @@ void RtspConnection::HandleRtcp(SOCKET sockfd)
 	}
 }
 
+// 处理 RTSP 协议中的 OPTIONS 命令的响应逻辑
 void RtspConnection::HandleCmdOption()
 {
 	std::shared_ptr<char> res(new char[2048], std::default_delete<char[]>());
@@ -300,6 +301,24 @@ void RtspConnection::HandleCmdDescribe()
 			将当前客户端 Socket 和 RTP 连接添加到媒体会话中（AddClient），用于后续数据传输。
 			遍历所有媒体通道（如音视频），设置 RTP 时钟频率和负载类型。
 		*/
+		/*
+		1 与 SDP 描述的关联
+​			(1)SDP 描述：在 media_session->GetSdpMessage() 生成的 SDP 中，会包含如下信息：
+				a=rtpmap:96 H264/90000     // 负载类型 96，编码 H264，时钟频率 90000 Hz
+				a=rtpmap:97 AAC/44100      // 负载类型 97，编码 AAC，时钟频率 44100 Hz
+​			
+			(2)一致性要求：RTP 连接中设置的参数必须与 SDP 描述完全一致，否则接收端无法正确解析数据。
+		​
+		2 接收端的处理流程
+			接收端通过 SDP 得知负载类型和时钟频率。
+			接收端根据负载类型初始化解码器。
+			接收端根据时钟频率计算时间戳，实现同步播放。
+		​
+		3 总结
+​			时钟频率：告诉接收端如何将时间戳转换为真实时间，解决“何时播放”的问题。
+​			负载类型：告诉接收端如何解码数据，解决“如何播放”的问题。
+​			代码意义：在 RTSP 的 DESCRIBE 阶段，这些参数通过 SDP 发送给客户端，为后续的 SETUP 和 PLAY 请求奠定基础。
+		*/
 		for(int chn=0; chn<MAX_MEDIA_CHANNEL; chn++) {
 			MediaSource* source = media_session->GetMediaSource((MediaChannelId)chn);
 			if(source != nullptr) {
@@ -343,6 +362,35 @@ void RtspConnection::HandleCmdDescribe()
 */
 void RtspConnection::HandleCmdSetup()
 {
+	// 这个函数会进入两次
+
+	// 第一次：协商 h264
+	/*
+	SETUP rtsp://127.0.0.1:8554/live/track0 RTSP/1.0
+	CSeq: 4
+	User-Agent: LibVLC/3.0.21 (LIVE555 Streaming Media v2016.11.28)
+	Transport: RTP/AVP;unicast;client_port=50296-50297
+	*/
+
+	// 第二次：协商 aac
+	/*
+	SETUP rtsp://127.0.0.1:8554/live/track1 RTSP/1.0
+	CSeq: 5
+	User-Agent: LibVLC/3.0.21 (LIVE555 Streaming Media v2016.11.28)
+	Transport: RTP/AVP;unicast;client_port=65492-65493
+	Session: 44984
+
+	*/
+
+	/*
+	正常行为：
+		两次 SETUP 请求是 RTSP 协议中处理多轨道的标准流程。
+​	关键点：
+		每个轨道独立配置传输参数。
+		复用同一会话 ID 管理多个轨道。
+​		调试方向：检查 SDP 声明、会话 ID 传递、端口分配是否合理。
+	*/
+
 	/*
 	身份验证
 
@@ -416,9 +464,11 @@ void RtspConnection::HandleCmdSetup()
 			uint16_t peer_rtcp_port = rtsp_request_->GetRtcpPort();
 			uint16_t session_id = rtp_conn_->GetRtpSessionId();
 
+			// 通过 UDP 协议建立 RTP/RTCP 传输通道，核心步骤包括绑定本地端口、配置对端地址及优化缓冲区
 			if(rtp_conn_->SetupRtpOverUdp(channel_id, peer_rtp_port, peer_rtcp_port)) {
 				SOCKET rtcp_fd = rtp_conn_->GetRtcpSocket(channel_id);
 				rtcp_channels_[channel_id].reset(new Channel(rtcp_fd));
+				// HandleRtcp 仅仅保活用，不做任何控制
 				rtcp_channels_[channel_id]->SetReadCallback([rtcp_fd, this]() { this->HandleRtcp(rtcp_fd); });
 				rtcp_channels_[channel_id]->EnableReading();
 				task_scheduler_->UpdateChannel(rtcp_channels_[channel_id]);
@@ -489,6 +539,12 @@ void RtspConnection::HandleCmdTeardown()
 	//HandleClose();
 }
 
+/*
+代码功能：响应 RTSP GET_PARAMETER 请求，用于会话保活或简单参数确认。
+​调用时机：客户端在会话建立后发送 GET_PARAMETER 请求（如保活或查询参数）。
+​现状局限：仅实现保活逻辑，未支持具体参数查询。
+​协议合规性：符合基础要求，但功能不完整，需扩展参数处理逻辑。
+*/
 void RtspConnection::HandleCmdGetParamter()
 {
 	if (rtp_conn_ == nullptr) {

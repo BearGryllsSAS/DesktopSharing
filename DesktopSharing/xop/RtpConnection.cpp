@@ -187,6 +187,42 @@ bool RtpConnection::SetupRtpOverMulticast(MediaChannelId channel_id, std::string
 /*
 激活通道的播放状态
 */
+/*
+影响的是：
+
+// 根据传输模式选择TCP/UDP发送，通过任务调度器确保线程安全
+int RtpConnection::SendRtpPacket(MediaChannelId channel_id, RtpPacket pkt)
+{
+	// 这条线跟过来的话，有时候会经过这里，导致直接返回-1。因为rtsp协议相关的工作还没做好
+	if (is_closed_) {
+		return -1;
+	}
+
+	auto conn = rtsp_connection_.lock();
+	if (!conn) {
+		return -1;
+	}
+	RtspConnection* rtsp_conn = (RtspConnection*)conn.get();
+	// 在这里设置 TaskScheduler 中的回调函数
+	bool ret = rtsp_conn->task_scheduler_->AddTriggerEvent([this, channel_id, pkt] {
+		this->SetFrameType(pkt.type);
+		this->SetRtpHeader(channel_id, pkt);
+		if ((media_channel_info_[channel_id].is_play || media_channel_info_[channel_id].is_record) && has_key_frame_) {
+			if (transport_mode_ == RTP_OVER_TCP) {
+				SendRtpOverTcp(channel_id, pkt);
+			}
+			else {
+				SendRtpOverUdp(channel_id, pkt);
+			}
+
+			//media_channel_info_[channel_id].octetCount  += pkt.size;
+			//media_channel_info_[channel_id].packetCount += 1;
+		}
+		});
+
+	return ret ? 0 : -1;
+}
+*/
 void RtpConnection::Play()
 {
 	for(int chn=0; chn<MAX_MEDIA_CHANNEL; chn++) {
